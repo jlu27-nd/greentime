@@ -14,8 +14,8 @@ test('real HTTP flow: signup, link, chores, approval, ledger, sessions, and fami
  const code=(await k.call('linkCode')).data.code;assert(code);assert.equal((await p.call('link',{code})).status,200);assert.equal((await stranger.call('link',{code})).status,400);
  const initial=(await p.call()).data;const childId=initial.state.members.find(x=>x.role==='kid').id;
  assert.equal((await p.call('saveTask',{title:'Read a chapter',childId,minutes:15,photoRequired:false})).status,200);
- const task=(await k.call()).data.state.tasks[0];assert.equal((await k.call('submit',{taskId:task.id,note:'Done!'})).status,200);
- const sub=(await p.call()).data.state.submissions[0];assert.equal((await k.call('review',{id:sub.id,decision:'approved'})).status,403);assert.equal((await stranger.call('review',{id:sub.id,decision:'approved'})).status,404);
+ const task=(await k.call()).data.state.tasks[0];assert.equal((await k.call('submit',{taskId:task.id,note:'Done!',photo:'data:image/png;base64,iVBORw0KGgo='})).status,200);
+ const sub=(await p.call()).data.state.submissions[0];assert.equal(sub.ai.verdict,'unavailable');assert.match(sub.photo,/^data:image/);assert.equal((await k.call()).data.state.members[0].balance,0);assert.equal((await k.call('review',{id:sub.id,decision:'approved'})).status,403);assert.equal((await stranger.call('review',{id:sub.id,decision:'approved'})).status,404);
  const approvals=await Promise.all([p.call('review',{id:sub.id,decision:'approved'}),p.call('review',{id:sub.id,decision:'approved'})]);assert(approvals.every(x=>x.status===200));
  const pv=(await p.call()).data.state.members.find(x=>x.id===childId),kv=(await k.call()).data.state.members[0];assert.equal(pv.balance,15);assert.equal(kv.balance,15);
  await k.call('requestTime',{minutes:10});const rid=(await p.call()).data.state.requests[0].id;await p.call('reviewTime',{id:rid,decision:'approved'});await p.call('reviewTime',{id:rid,decision:'approved'});assert.equal((await k.call()).data.state.members[0].balance,5);

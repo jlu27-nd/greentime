@@ -25,6 +25,7 @@ export default async function handler(req,res){
    const snapshot=await transaction(async db=>{const u=await session(db,req);ensure(u.role==='parent','Only parents can ask Greenie to review photos.',403);const s=await family(db,u);const sub=s.submissions.find(x=>x.id===p.id);ensure(sub,'Submission not found.',404);return {sub,u};});
    const result=await assess(snapshot.sub);await transaction(async db=>{const u=await session(db,req);ensure(u.id===snapshot.u.id,'Session changed.',403);const s=await family(db,u);const sub=s.submissions.find(x=>x.id===p.id);ensure(sub&&sub.status!=='discarded','Submission is no longer available.');sub.ai=result;await save(db,u,s);});res.end(JSON.stringify({ok:true}));return;
   }
+  let photoReview;
   const out=await transaction(async db=>{
    if(p.action==='demo'){
     ensure(demo(),'Demo login is disabled.',404);ensure(['parent','kid'].includes(p.role),'Invalid role.');
@@ -47,8 +48,15 @@ export default async function handler(req,res){
    const publicUser={id:u.id,name:u.name,role:u.role,linked:!!u.family_id};
    if(!u.family_id){ensure(!p.action,'Link to a parent first.');return {user:publicUser,state:null,demo:demo()};}
    const s=await family(db,u),m=await members(db,u);
-   if(p.action){ensure(typeof p.requestId==='string'&&p.requestId.length<=100,'Request identifier required.');applyAction(s,u,p.action,p,m);await save(db,u,s);}
+   if(p.action){ensure(typeof p.requestId==='string'&&p.requestId.length<=100,'Request identifier required.');const duplicate=s.receipts.includes(p.requestId);applyAction(s,u,p.action,p,m);
+    if(p.action==='submit'&&!duplicate&&p.photo){const sub=s.submissions[0];sub.ai={verdict:'pending',confidence:'unknown',reason:'Greenie is reviewing this photo. Your parent makes the final decision.'};photoReview={sub:structuredClone(sub),u};}
+    await save(db,u,s);}
    return {user:publicUser,state:view(s,u,m),demo:demo()};
-  });res.end(JSON.stringify(out));
+  });
+  if(photoReview){
+   let result;try{result=await assess(photoReview.sub);}catch{result={verdict:'unavailable',confidence:'unknown',reason:'Your photo is saved. Greenie could not review it right now; your parent can review it or retry Greenie.'};}
+   try{await transaction(async db=>{const s=await family(db,photoReview.u);const sub=s.submissions.find(x=>x.id===photoReview.sub.id);if(sub&&sub.status!=='discarded'&&sub.ai?.verdict==='pending'){sub.ai=result;await save(db,photoReview.u,s);}});}catch{console.error('Greenie assessment could not be saved; submission remains available for parent review.');}
+  }
+  res.end(JSON.stringify(out));
  }catch(e){res.statusCode=e.status||500;res.end(JSON.stringify({error:e.status?e.message:'Something went wrong. Please try again; no changes were committed.'}));if(!e.status)console.error('GreenTime request failed:',e.code||e.name);}
 }

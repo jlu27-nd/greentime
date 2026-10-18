@@ -18,13 +18,13 @@ Open http://127.0.0.1:4174. Choose **Try kid view** or **Try parent view** for t
 - Parent and kid signup/sign-in with hashed passwords and HTTP-only session cookies.
 - One-time, 15-minute child linking codes.
 - Chore creation/editing/archiving, icons, categories, child assignment, instructions, photo requirements, AI criteria, and daily recurrence.
-- Child photo/note submissions, review status, and completed work.
+- Child camera capture or library selection, photo preview/removal, automatic resizing to 1600px JPEG, photo/note submissions, and completed work. Mobile capture uses the device camera where supported; desktop falls back to a file picker.
 - Parent approval/concurrence, denial, return with feedback, revocation, and discard.
 - A transaction-protected ledger used by both dashboards. Repeated approvals do not duplicate minutes. Revocations reverse original credit; already-spent credit becomes a visible repayment balance.
 - Parent-controlled screen-time requests and a recorded session end time.
 - First Little Win, Helping Hand, and Family Teammate milestone badges.
 - Event log and per-child app rules.
-- Optional Greenie photo assessment. AI advice never changes credits; parents make every final decision.
+- Automatic Greenie assessment after a photo submission is saved. Parents see the photo and AI feedback together and can retry Greenie. AI failures leave the submission available for manual review. AI advice never changes credits; parents make every final decision.
 
 ## Vercel setup
 
@@ -52,7 +52,7 @@ Eleven tests cover real HTTP signup/linking/session flows, role and household is
 - App rules are a family policy list, not operating-system app blocking. Actual enforcement requires a separate native/device-management integration.
 - Daily recurring chores reset at midnight UTC (shown in the editor).
 - Photo data is restricted by session/family membership and stored inside the family state for this small MVP. Photos are limited to 2 MB. Before substantial growth, move uploads to private object storage and normalize the family state into individual records.
-- If a parent chooses Ask Greenie, that submission photo and task criteria are sent to OpenAI, through Vercel AI Gateway when configured. Responses are requested with `store:false`; this is not a claim of zero provider retention.
+- On photo submission, and when a parent retries Ask Greenie, that submission photo and task criteria are sent to OpenAI, through Vercel AI Gateway when configured. Responses are requested with `store:false`; this is not a claim of zero provider retention.
 - No email delivery, email verification, password recovery, native device controls, or production observability is configured. Add and validate these before a broader family rollout.
 - Credit reversals can create debt after minutes have already been used. Available screen time is zero until future earnings repay the debt; the underlying ledger remains auditable.
 
