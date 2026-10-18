@@ -43,11 +43,12 @@ pnpm test
 pnpm build
 ```
 
-Nine tests cover real HTTP signup/linking/session flows, role and household isolation, duplicate approval, concurrent approval, return/resubmission, revocation, balance deductions, badges, and photo requirements. Local browser verification also confirmed that parent approval updates both balances to the same amount and unlocks the first badge.
+Eleven tests cover real HTTP signup/linking/session flows, role and household isolation, duplicate approval, concurrent approval, return/resubmission, revocation, balance deductions, badges, and photo requirements. Local browser verification also confirmed that parent approval updates both balances to the same amount and unlocks the first badge.
 
 ## Boundaries and remaining deployment validation
 
-- Vercel/PostgreSQL execution and a live Greenie API call have not been tested because cloud resources and API credentials are not configured yet. Local SQLite tests do not establish production PostgreSQL behavior.
+- Deployed at https://greentime-one.vercel.app in the Jon Lu LLC Vercel team, project `greentime`. Neon Free PostgreSQL is connected. Hosted checks passed signup, linking, photo persistence, parent-only decisions, concurrent duplicate approval, shared balances, and single screen-time deductions.
+- Greenie uses Vercel AI Gateway with `openai/gpt-4.1-mini`. Its first live request was blocked while the team had no active AI credits; card verification is pending. Do not treat the configured feature as live-verified until a successful assessment is recorded.
 - App rules are a family policy list, not operating-system app blocking. Actual enforcement requires a separate native/device-management integration.
 - Daily recurring chores reset at midnight UTC (shown in the editor).
 - Photo data is restricted by session/family membership and stored inside the family state for this small MVP. Photos are limited to 2 MB. Before substantial growth, move uploads to private object storage and normalize the family state into individual records.
