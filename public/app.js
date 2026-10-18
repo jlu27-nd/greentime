@@ -3,6 +3,9 @@ preparePush()?.catch(()=>{});
 let phonePushEnabled=false;
 const $=s=>document.querySelector(s),esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let user=null,state=null,config={},tab='Reviews',authMode='choose',authRole='parent',busy=false;
+const entryParams=new URLSearchParams(location.search);
+if(entryParams.get('signup')==='parent'){authMode='register';authRole='parent';}
+else if(entryParams.get('signin')==='1')authMode='login';
 const modal=$('#modal'),content=$('#modal-content');
 async function preparePhoto(file){
  if(file.size>30*1024*1024)throw new Error('Choose a photo smaller than 30 MB.');

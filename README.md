@@ -82,3 +82,9 @@ Teach Greenie saves explicit, editable standards for the same task, with change 
 Production uses server-only VAPID credentials in Vercel. Parents enable alerts from Greenie updates and allow the OS prompt; iOS/iPadOS 16.4+ requires opening the app from its Home Screen installation. Enabling requests a test notification. Signing out disables this browser subscription. The manifest and service worker enable background alerts without caching authenticated pages or photos.
 
 High-confidence approvals atomically enqueue one delivery per registered parent device. Generic encrypted alerts link to `/?review=<submissionId>`; photo access and revocation still require the correct parent session. Transient delivery failures remain in the database and retry on subsequent family API activity (up to five attempts); there is no independent retry scheduler. Browser push services retain accepted alerts for up to 24 hours. Expired subscriptions are removed. Phone/OS delivery can be delayed or blocked by device notification settings; in-app alerts remain available.
+
+## Public welcome page and product film
+
+The marketing page is served at `/welcome/` on the same public Vercel production domain. Its primary calls to action open `/?signup=parent`; `/?signin=1` opens sign-in. Existing signed-in users keep their dashboard.
+
+The silent 15-second MP4 uses real MVP screenshots with an isolated sample family, exact typeset captions, and the unchanged original logo animated at the end. No generated UI, voiceover, or music. Controls, English captions, and a text description are provided. Binary media is stored losslessly as base64 and decoded during the build; base64 source is excluded from deployed files. `scripts/render-hero-video.py` documents the local composition and capture filenames.
