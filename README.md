@@ -88,3 +88,5 @@ High-confidence approvals atomically enqueue one delivery per registered parent 
 The marketing page is served at `/welcome/` on the same public Vercel production domain. Its primary calls to action open `/?signup=parent`; `/?signin=1` opens sign-in. Existing signed-in users keep their dashboard.
 
 The silent 15-second MP4 uses real MVP screenshots with an isolated sample family, exact typeset captions, and the unchanged original logo animated at the end. No generated UI, voiceover, or music. Controls, English captions, and a text description are provided. Binary media is stored losslessly as base64 and decoded during the build; base64 source is excluded from deployed files. `scripts/render-hero-video.py` documents the local composition and capture filenames.
+
+The current hero uses `greentime-family.mp4`: the original family footage with real mobile MVP captures perspective-tracked into the phone display. Hand occlusion is retained, generated badge text is covered with exact typography, and the original logo animates at the end. The file contains a video stream only (no audio). `scripts/composite-family-video.py` records the compositing workflow.
