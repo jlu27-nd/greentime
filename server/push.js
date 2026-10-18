@@ -16,7 +16,7 @@ export async function queueApproval(db,familyId,notification){
  if(!notification)return;
  const devices=await db.q("SELECT p.* FROM push_subscriptions p JOIN users u ON p.user_id=u.id WHERE u.family_id=$1 AND u.role='parent'",[familyId]);
  for(const device of devices){
-  const payload={title:'Greenie approved a chore',body:'Provisional screen time was earned. Tap to view the photo and confirm or revoke it.',url:`${device.origin}/?review=${encodeURIComponent(notification.submissionId)}`,tag:`greentime-${notification.id}`};
+  const payload={title:'Greenie approved a chore',body:'Provisional screen time was earned. Tap to view the photo and confirm or revoke it.',url:`${device.origin}/app/?review=${encodeURIComponent(notification.submissionId)}`,tag:`greentime-${notification.id}`};
   await db.q('INSERT INTO push_deliveries(id,subscription_id,family_id,payload) VALUES($1,$2,$3,$4) ON CONFLICT(id) DO NOTHING',[`${notification.id}:${device.id}`,device.id,familyId,JSON.stringify(payload)]);
  }
 }

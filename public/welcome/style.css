@@ -6,3 +6,5 @@
 
 .watch-link{display:block;width:fit-content;margin-top:20px;font-size:14px;font-weight:700;text-decoration:underline;text-underline-offset:5px}.watch-link span{margin-left:8px}
 @media(max-width:740px){.hero-art .orbit-two{width:calc(100% - 70px)}}
+
+.hero-signin{display:block;width:fit-content;margin-top:18px;font-size:14px;font-weight:700;text-decoration:underline;text-underline-offset:4px}.nav-signin{border:1px solid var(--ink);border-radius:30px;padding:13px 20px}.nav-cta{background:var(--green)}@media(max-width:740px){nav>a.nav-signin{display:block;font-size:12px;padding:11px 13px}.nav-cta{padding:11px 13px}.header nav{gap:8px}.nav-cta span{display:none}}

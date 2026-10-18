@@ -20,7 +20,7 @@ test('push delivery is queued once, uses a protected review link, and removes ex
   await db.q('INSERT INTO push_subscriptions(id,user_id,subscription,origin) VALUES($1,$2,$3,$4)',[id,'push-parent',JSON.stringify(sub),'https://greentime-one.vercel.app']);
   const n={id:'n1',submissionId:'s1'};await queueApproval(db,'push-family',n);await queueApproval(db,'push-family',n);
  });
- let calls=0;t.mock.method(webpush,'sendNotification',async(device,payload)=>{calls++;const p=JSON.parse(payload);assert.equal(device.endpoint,sub.endpoint);assert.equal(p.url,'https://greentime-one.vercel.app/?review=s1');assert(!payload.includes('data:image'));return {statusCode:201};});
+ let calls=0;t.mock.method(webpush,'sendNotification',async(device,payload)=>{calls++;const p=JSON.parse(payload);assert.equal(device.endpoint,sub.endpoint);assert.equal(p.url,'https://greentime-one.vercel.app/app/?review=s1');assert(!payload.includes('data:image'));return {statusCode:201};});
  await deliverPending('push-family');await deliverPending('push-family');assert.equal(calls,1);
  await transaction(db=>queueApproval(db,'push-family',{id:'n2',submissionId:'s2'}));
  webpush.sendNotification.mock.mockImplementation(async()=>{throw {statusCode:410};});await deliverPending('push-family');

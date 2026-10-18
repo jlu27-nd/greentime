@@ -8,6 +8,8 @@ test('real HTTP flow: signup, link, chores, approval, ledger, sessions, and fami
  const child=spawn(process.execPath,['server/local.js'],{env:{...process.env,PORT:String(port),DATABASE_URL:'',DEMO_MODE:'false',SQLITE_PATH:`.data/test-${randomUUID()}.sqlite`},stdio:['ignore','pipe','pipe']});
  try{
  await new Promise((resolve,reject)=>{child.stdout.once('data',resolve);child.once('error',reject);child.once('exit',()=>reject(new Error('Test server exited.')));});
+ const landing=await fetch(origin+'/');assert.match(await landing.text(),/Sign up for GreenTime/);
+ const app=await fetch(origin+'/app/?signin=1');assert.match(await app.text(),/id="session"/);
  const client=()=>({cookie:'',async call(action,p={}){const r=await fetch(origin+'/api',{method:action?'POST':'GET',headers:{'Content-Type':'application/json',Origin:origin,Cookie:this.cookie},...(action?{body:JSON.stringify({...p,action,requestId:randomUUID()})}:{})});if(r.headers.get('set-cookie'))this.cookie=r.headers.get('set-cookie').split(';')[0];return {status:r.status,data:await r.json()};}});
  const p=client(),k=client(),stranger=client();
  for(const [c,role,email]of [[p,'parent','parent@test.invalid'],[k,'kid','kid@test.invalid'],[stranger,'parent','other@test.invalid']])assert.equal((await c.call('register',{role,email,password:'test-password-123',name:role})).status,200);

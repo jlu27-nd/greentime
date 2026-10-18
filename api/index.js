@@ -48,7 +48,7 @@ export default async function handler(req,res){
     const endpoint=String(p.endpoint||p.subscription?.endpoint||''),id=subscriptionId(endpoint);
     if(p.action==='pushTest'){
      const [device]=await db.q('SELECT * FROM push_subscriptions WHERE id=$1 AND user_id=$2',[id,u.id]);ensure(device,'Enable notifications on this device first.');
-     await db.q('INSERT INTO push_deliveries(id,subscription_id,family_id,payload) VALUES($1,$2,$3,$4)',[randomUUID(),id,u.family_id,JSON.stringify({title:'GreenTime phone alerts are ready',body:'You’ll receive an alert when Greenie provisionally approves a chore.',url:device.origin+'/',tag:'greentime-test'})]);return {ok:true};
+     await db.q('INSERT INTO push_deliveries(id,subscription_id,family_id,payload) VALUES($1,$2,$3,$4)',[randomUUID(),id,u.family_id,JSON.stringify({title:'GreenTime phone alerts are ready',body:'You’ll receive an alert when Greenie provisionally approves a chore.',url:device.origin+'/app/',tag:'greentime-test'})]);return {ok:true};
     }
     if(p.action==='pushStatus'){const rows=await db.q('SELECT id FROM push_subscriptions WHERE id=$1 AND user_id=$2',[id,u.id]);return {enabled:rows.length>0};}
     if(p.action==='pushUnsubscribe'){await db.q('DELETE FROM push_deliveries WHERE subscription_id IN (SELECT id FROM push_subscriptions WHERE id=$1 AND user_id=$2)',[id,u.id]);await db.q('DELETE FROM push_subscriptions WHERE id=$1 AND user_id=$2',[id,u.id]);return {ok:true};}
