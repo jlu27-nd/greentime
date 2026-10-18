@@ -48,7 +48,7 @@ Eleven tests cover real HTTP signup/linking/session flows, role and household is
 ## Boundaries and remaining deployment validation
 
 - Deployed at https://greentime-one.vercel.app in the Jon Lu LLC Vercel team, project `greentime`. Neon Free PostgreSQL is connected. Hosted checks passed signup, linking, photo persistence, parent-only decisions, concurrent duplicate approval, shared balances, and single screen-time deductions.
-- Greenie uses Vercel AI Gateway with `openai/gpt-4.1-mini`. Its first live request was blocked while the team had no active AI credits; card verification is pending. Do not treat the configured feature as live-verified until a successful assessment is recorded.
+- Greenie uses Vercel AI Gateway with `openai/gpt-4.1-mini`. Live photo review passed on October 18, 2026 using a synthetic verification task and the GreenTime logo: Greenie correctly identified the green laptop illustration. The assessment was saved, credits stayed at zero until parent approval, and duplicate parent approvals awarded the credit only once. This confirms service integration, not accuracy across real-world chore photos.
 - App rules are a family policy list, not operating-system app blocking. Actual enforcement requires a separate native/device-management integration.
 - Daily recurring chores reset at midnight UTC (shown in the editor).
 - Photo data is restricted by session/family membership and stored inside the family state for this small MVP. Photos are limited to 2 MB. Before substantial growth, move uploads to private object storage and normalize the family state into individual records.
