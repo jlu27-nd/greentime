@@ -2,6 +2,7 @@ import { randomUUID, randomBytes, createHash, scryptSync, timingSafeEqual } from
 import { transaction } from '../server/db.js';
 import { emptyState, applyAction, view, ensure, recordGreenie } from '../server/domain.js';
 import { assess, greenieConfigured } from '../server/greenie.js';
+import {pushConfigured,validateSubscription,subscriptionId,queueApproval,deliverPending} from '../server/push.js';
 const digest=x=>createHash('sha256').update(x).digest('hex');
 const hashPassword=p=>{const salt=randomBytes(16).toString('hex');return salt+':'+scryptSync(p,salt,64).toString('hex');};
 const verify=(p,h)=>{const [salt,key]=h.split(':');return !!key&&timingSafeEqual(Buffer.from(key,'hex'),scryptSync(p,salt,64));};
@@ -15,17 +16,17 @@ async function limit(db,key,max=15){const now=Date.now();let [a]=await db.q('SEL
 export default async function handler(req,res){
  res.setHeader('Content-Type','application/json');res.setHeader('Cache-Control','no-store');
  try{
-  if(req.method==='GET'){const config=new URL(req.url,'http://local').searchParams.get('config');if(config){res.end(JSON.stringify({demo:demo(),greenie:greenieConfigured()}));return;}}
+  if(req.method==='GET'){const config=new URL(req.url,'http://local').searchParams.get('config');if(config){res.end(JSON.stringify({demo:demo(),greenie:greenieConfigured(),pushPublicKey:pushConfigured()?process.env.VAPID_PUBLIC_KEY:null}));return;}}
   ensure(['GET','POST'].includes(req.method),'Method not allowed.',405);
   if(req.method==='POST'){ensure(req.headers['content-type']?.includes('application/json'),'JSON required.',415);const origin=req.headers.origin;ensure(!origin||new URL(origin).host===req.headers.host,'Request origin is not allowed.',403);}
   let p=req.body;if(req.method==='POST'&&!p){let raw='';for await(const c of req){raw+=c;ensure(Buffer.byteLength(raw)<=3000000,'Upload is too large.',413);}p=JSON.parse(raw||'{}');}
   p=p||{};ensure(JSON.stringify(p).length<=3000000,'Upload is too large.',413);
-  if(['login','register','link','greenie'].includes(p.action)){const key=digest(`${p.action}:${req.socket?.remoteAddress||'remote'}:${String(p.email||'').toLowerCase()}`);const allowed=await transaction(db=>limit(db,key,p.action==='greenie'?30:15));ensure(allowed,'Too many attempts. Please try again in 15 minutes.',429);}
+  if(['login','register','link','greenie','pushTest'].includes(p.action)){const key=digest(`${p.action}:${req.socket?.remoteAddress||'remote'}:${String(p.email||'').toLowerCase()}`);const allowed=await transaction(db=>limit(db,key,p.action==='greenie'?30:15));ensure(allowed,'Too many attempts. Please try again in 15 minutes.',429);}
   if(p.action==='greenie'){
    const snapshot=await transaction(async db=>{const u=await session(db,req);ensure(u.role==='parent','Only parents can ask Greenie to review photos.',403);const s=await family(db,u);const sub=s.submissions.find(x=>x.id===p.id);ensure(sub,'Submission not found.',404);const task=s.tasks.find(t=>t.id===sub.taskId);return {sub:{...sub,criteria:task?.criteria??sub.criteria},u};});
-   const result=await assess(snapshot.sub);await transaction(async db=>{const u=await session(db,req);ensure(u.id===snapshot.u.id,'Session changed.',403);const s=await family(db,u);const sub=s.submissions.find(x=>x.id===p.id);ensure(sub&&sub.status!=='discarded','Submission is no longer available.');recordGreenie(s,sub.id,result);await save(db,u,s);});res.end(JSON.stringify({ok:true}));return;
+   const result=await assess(snapshot.sub);await transaction(async db=>{const u=await session(db,req);ensure(u.id===snapshot.u.id,'Session changed.',403);const s=await family(db,u);const sub=s.submissions.find(x=>x.id===p.id);ensure(sub&&sub.status!=='discarded','Submission is no longer available.');const notification=recordGreenie(s,sub.id,result);await save(db,u,s);await queueApproval(db,u.family_id,notification);});await deliverPending(snapshot.u.family_id);res.end(JSON.stringify({ok:true}));return;
   }
-  let photoReview;
+  let photoReview,deliveryFamily;
   const out=await transaction(async db=>{
    if(p.action==='demo'){
     ensure(demo(),'Demo login is disabled.',404);ensure(['parent','kid'].includes(p.role),'Invalid role.');
@@ -41,7 +42,24 @@ export default async function handler(req,res){
     else ensure(u&&verify(password,u.password),'Email or password did not match.',401);
     return issueSession(db,res,u);
    }
-   const u=await session(db,req);
+   const u=await session(db,req);deliveryFamily=u.family_id;
+   if(['pushSubscribe','pushUnsubscribe','pushStatus','pushTest'].includes(p.action)){
+    ensure(u.role==='parent','Only parents can enable notifications.',403);
+    const endpoint=String(p.endpoint||p.subscription?.endpoint||''),id=subscriptionId(endpoint);
+    if(p.action==='pushTest'){
+     const [device]=await db.q('SELECT * FROM push_subscriptions WHERE id=$1 AND user_id=$2',[id,u.id]);ensure(device,'Enable notifications on this device first.');
+     await db.q('INSERT INTO push_deliveries(id,subscription_id,family_id,payload) VALUES($1,$2,$3,$4)',[randomUUID(),id,u.family_id,JSON.stringify({title:'GreenTime phone alerts are ready',body:'You’ll receive an alert when Greenie provisionally approves a chore.',url:device.origin+'/',tag:'greentime-test'})]);return {ok:true};
+    }
+    if(p.action==='pushStatus'){const rows=await db.q('SELECT id FROM push_subscriptions WHERE id=$1 AND user_id=$2',[id,u.id]);return {enabled:rows.length>0};}
+    if(p.action==='pushUnsubscribe'){await db.q('DELETE FROM push_deliveries WHERE subscription_id IN (SELECT id FROM push_subscriptions WHERE id=$1 AND user_id=$2)',[id,u.id]);await db.q('DELETE FROM push_subscriptions WHERE id=$1 AND user_id=$2',[id,u.id]);return {ok:true};}
+    ensure(pushConfigured(),'Phone notifications are not configured yet.',503);
+    const subscription=validateSubscription(p.subscription),devices=await db.q('SELECT id FROM push_subscriptions WHERE user_id=$1',[u.id]);ensure(devices.length<10||devices.some(d=>d.id===id),'You have reached the limit of 10 devices.');
+    const origin=new URL(req.headers.origin||('https://'+req.headers.host)).origin;
+    const [previous]=await db.q('SELECT user_id FROM push_subscriptions WHERE id=$1',[id]);
+    if(previous&&previous.user_id!==u.id)await db.q('DELETE FROM push_deliveries WHERE subscription_id=$1',[id]);
+    await db.q('INSERT INTO push_subscriptions(id,user_id,subscription,origin) VALUES($1,$2,$3,$4) ON CONFLICT(id) DO UPDATE SET user_id=excluded.user_id,subscription=excluded.subscription,origin=excluded.origin',[id,u.id,JSON.stringify(subscription),origin]);
+    return {ok:true};
+   }
    if(p.action==='logout'){const token=(req.headers.cookie||'').match(/gt_session=([a-f0-9]+)/)?.[1];await db.q('DELETE FROM sessions WHERE token=$1',[digest(token||'')]);res.setHeader('Set-Cookie','gt_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');return {ok:true};}
    if(p.action==='linkCode'){ensure(u.role==='kid'&&!u.family_id,'Only an unlinked child can generate a code.');const code=randomBytes(6).toString('hex').toUpperCase();await db.q('UPDATE users SET link_code=$1,link_expires=$2 WHERE id=$3',[digest(code),Date.now()+900000,u.id]);return {code};}
    if(p.action==='link'){ensure(u.role==='parent','Only a parent can link a child.',403);const [kid]=await db.q('SELECT * FROM users WHERE link_code=$1'+db.lock,[digest(String(p.code||'').trim().toUpperCase())]);ensure(kid&&kid.role==='kid'&&!kid.family_id&&+kid.link_expires>Date.now(),'This code is invalid or expired.');await db.q('UPDATE users SET family_id=$1,link_code=NULL,link_expires=NULL WHERE id=$2',[u.family_id,kid.id]);return {ok:true};}
@@ -55,8 +73,9 @@ export default async function handler(req,res){
   });
   if(photoReview){
    let result;try{result=await assess(photoReview.sub);}catch{result={verdict:'unavailable',confidence:'unknown',reason:'Your photo is saved. Greenie could not review it right now; your parent can review it or retry Greenie.'};}
-   try{await transaction(async db=>{const s=await family(db,photoReview.u);const sub=s.submissions.find(x=>x.id===photoReview.sub.id);if(sub&&sub.status!=='discarded'&&sub.ai?.verdict==='pending'){recordGreenie(s,sub.id,result);await save(db,photoReview.u,s);}});}catch{console.error('Greenie assessment could not be saved; submission remains available for parent review.');}
+   try{await transaction(async db=>{const s=await family(db,photoReview.u);const sub=s.submissions.find(x=>x.id===photoReview.sub.id);if(sub&&sub.status!=='discarded'&&sub.ai?.verdict==='pending'){const notification=recordGreenie(s,sub.id,result);await save(db,photoReview.u,s);await queueApproval(db,photoReview.u.family_id,notification);}});}catch{console.error('Greenie assessment could not be saved; submission remains available for parent review.');}
   }
+  await deliverPending(deliveryFamily);
   res.end(JSON.stringify(out));
  }catch(e){res.statusCode=e.status||500;res.end(JSON.stringify({error:e.status?e.message:'Something went wrong. Please try again; no changes were committed.'}));if(!e.status)console.error('GreenTime request failed:',e.code||e.name);}
 }

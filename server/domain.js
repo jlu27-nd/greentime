@@ -15,8 +15,10 @@ export function recordGreenie(s,id,result){
  const now=Date.now(),net=s.ledger.filter(x=>x.submissionId===id).reduce((n,x)=>n+x.amount,0),delta=sub.minutes-net;
  if(delta)s.ledger.push({id:randomUUID(),at:now,childId:sub.childId,amount:delta,reason:`Greenie provisional approval: ${sub.title}`,submissionId:id});
  sub.status='approved';sub.approvalSource='greenie';sub.provisional=true;sub.reviewedAt=now;
- (s.notifications??=[]).unshift({id:randomUUID(),submissionId:id,childId:sub.childId,title:sub.title,minutes:sub.minutes,at:now,readBy:[]});
+ const notification={id:randomUUID(),submissionId:id,childId:sub.childId,title:sub.title,minutes:sub.minutes,at:now,readBy:[]};
+ (s.notifications??=[]).unshift(notification);
  s.events.unshift({id:randomUUID(),at:now,actor:'Greenie',message:`Provisionally approved: ${sub.title}`,childId:sub.childId,amount:delta});
+ return notification;
 }
 export function applyAction(s,user,action,p={},members=[]){
   const now=Date.now(),id=randomUUID(),parent=()=>ensure(user.role==='parent','Only a parent can do that.',403);

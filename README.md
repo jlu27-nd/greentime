@@ -43,7 +43,7 @@ pnpm test
 pnpm build
 ```
 
-Seventeen tests cover real HTTP signup/linking/session flows, role and household isolation, duplicate approval, concurrent approval, return/resubmission, revocation, balance deductions, badges, and photo requirements. Local browser verification also confirmed that parent approval updates both balances to the same amount and unlocks the first badge.
+Nineteen tests cover real HTTP signup/linking/session flows, role and household isolation, duplicate approval, concurrent approval, return/resubmission, revocation, balance deductions, badges, and photo requirements. Local browser verification also confirmed that parent approval updates both balances to the same amount and unlocks the first badge.
 
 ## Boundaries and remaining deployment validation
 
@@ -73,6 +73,12 @@ Seventeen tests cover real HTTP signup/linking/session flows, role and household
 
 ## Parent notifications and learning
 
-Provisional approvals create persistent in-app parent notifications, with per-parent read state, photo access, and revocation. The visible app refreshes every 15 seconds outside dialogs; notifications are also loaded on sign-in. These are not email, SMS, or closed-app push notifications.
+Provisional approvals create persistent in-app parent notifications, with per-parent read state, photo access, and revocation. The visible app refreshes every 15 seconds outside dialogs; notifications are also loaded on sign-in. Parents can additionally opt in to Web Push on each supported device.
 
 Teach Greenie saves explicit, editable standards for the same task, with change history and activity log entries. Parents can also append a review note as a future criterion by selecting the checkbox. New submissions snapshot the current standard; manual AI retries use the latest task standard. Assessments record criteriaUsed. This is task-specific context supplied to the model, not model fine-tuning or a guarantee of improved accuracy.
+
+## Phone push notifications
+
+Production uses server-only VAPID credentials in Vercel. Parents enable alerts from Greenie updates and allow the OS prompt; iOS/iPadOS 16.4+ requires opening the app from its Home Screen installation. Enabling requests a test notification. Signing out disables this browser subscription. The manifest and service worker enable background alerts without caching authenticated pages or photos.
+
+High-confidence approvals atomically enqueue one delivery per registered parent device. Generic encrypted alerts link to `/?review=<submissionId>`; photo access and revocation still require the correct parent session. Transient delivery failures remain in the database and retry on subsequent family API activity (up to five attempts); there is no independent retry scheduler. Browser push services retain accepted alerts for up to 24 hours. Expired subscriptions are removed. Phone/OS delivery can be delayed or blocked by device notification settings; in-app alerts remain available.

@@ -11,7 +11,7 @@ test('real HTTP flow: signup, link, chores, approval, ledger, sessions, and fami
  const client=()=>({cookie:'',async call(action,p={}){const r=await fetch(origin+'/api',{method:action?'POST':'GET',headers:{'Content-Type':'application/json',Origin:origin,Cookie:this.cookie},...(action?{body:JSON.stringify({...p,action,requestId:randomUUID()})}:{})});if(r.headers.get('set-cookie'))this.cookie=r.headers.get('set-cookie').split(';')[0];return {status:r.status,data:await r.json()};}});
  const p=client(),k=client(),stranger=client();
  for(const [c,role,email]of [[p,'parent','parent@test.invalid'],[k,'kid','kid@test.invalid'],[stranger,'parent','other@test.invalid']])assert.equal((await c.call('register',{role,email,password:'test-password-123',name:role})).status,200);
- const code=(await k.call('linkCode')).data.code;assert(code);assert.equal((await p.call('link',{code})).status,200);assert.equal((await stranger.call('link',{code})).status,400);
+ assert.equal((await k.call('pushStatus',{endpoint:'https://fcm.googleapis.com/test'})).status,403);assert.equal((await p.call('pushStatus',{endpoint:'https://fcm.googleapis.com/test'})).data.enabled,false);const code=(await k.call('linkCode')).data.code;assert(code);assert.equal((await p.call('link',{code})).status,200);assert.equal((await stranger.call('link',{code})).status,400);
  const initial=(await p.call()).data;const childId=initial.state.members.find(x=>x.role==='kid').id;
  assert.equal((await p.call('saveTask',{title:'Read a chapter',childId,minutes:15,photoRequired:false})).status,200);
  const task=(await k.call()).data.state.tasks[0];assert.equal((await k.call('submit',{taskId:task.id,note:'Done!',photo:'data:image/png;base64,iVBORw0KGgo='})).status,200);

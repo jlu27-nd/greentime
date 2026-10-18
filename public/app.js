@@ -1,3 +1,6 @@
+import {preparePush,pushStatus,enablePush,disablePush} from './push.js';
+preparePush()?.catch(()=>{});
+let phonePushEnabled=false;
 const $=s=>document.querySelector(s),esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let user=null,state=null,config={},tab='Reviews',authMode='choose',authRole='parent',busy=false;
 const modal=$('#modal'),content=$('#modal-content');
@@ -32,7 +35,7 @@ document.addEventListener('click',e=>{
 });
 function toast(s){$('#toast').textContent=s;$('#toast').classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('#toast').classList.remove('show'),6000);}
 async function api(action,p={}){const r=await fetch('/api',action?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...p,action,requestId:p.requestId||crypto.randomUUID()})}:{});let d;try{d=await r.json();}catch{throw new Error('Unable to reach GreenTime. Please try again.');}if(!r.ok)throw Object.assign(new Error(d.error||'Unable to save.'),{status:r.status});return d;}
-async function refresh(){try{const d=await api();user=d.user;state=d.state;render();}catch(e){if(e.status===401){user=null;state=null;render();}else toast(e.message);}}
+async function refresh(){try{const d=await api();user=d.user;state=d.state;render();openLinkedReview();}catch(e){if(e.status===401){user=null;state=null;render();}else toast(e.message);}}
 function open(html){content.innerHTML=html;modal.showModal();content.querySelector('input,button,select')?.focus();}
 $('.close').onclick=()=>modal.close();
 modal.addEventListener('click',e=>{if(e.target===modal){const r=modal.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)modal.close();}});
@@ -61,9 +64,15 @@ function render(){
  $('#main').innerHTML=banner+welcome+(user.role==='kid'?kidDashboard():notifications()+stats()+`<nav class="tabs" aria-label="Parent sections">${['Reviews','Tasks','Log','Kids','Rewards'].map(t=>`<button class="${tab===t?'active':''}" data-tab="${t}" aria-current="${tab===t?'page':'false'}">${t}</button>`).join('')}</nav>`+(tab==='Reviews'?reviews():tab==='Tasks'?`<div class="panel-heading"><h2>A little responsibility. A real reward.</h2>${button('+ New task','newTask','','primary')}</div><div class="grid">${state.tasks.filter(t=>t.active).map(t=>taskCard(t)).join('')}</div>${state.tasks.some(t=>t.active)?'':empty('Start with one little win','Create a chore your child can feel good about.')}`:tab==='Log'?history():tab==='Kids'?kids():rewards()));
 }
 function taskForm(t={}){open(`<h2>${t.id?'Edit':'Create'} a little win</h2><form class="form" data-form="task"><input type="hidden" name="id" value="${esc(t.id||'')}"><label>Icon<select name="icon">${['✅','🍽️','🐕','🚿','🛏️','🗑️','🧹','🌿','📚','🧺','🚗','🐱','🚴','🏃','🎯'].map(i=>`<option ${i===t.icon?'selected':''}>${i}</option>`).join('')}</select></label>${field('Task title','title',t.title,'text','required maxlength="100"')}<label>Description<textarea name="description" maxlength="1000">${esc(t.description)}</textarea></label><label>Instructions for your child<textarea name="instructions" maxlength="1500">${esc(t.instructions)}</textarea></label><label>Completion criteria for Greenie<textarea name="criteria" maxlength="1500">${esc(t.criteria)}</textarea><small>Describe what a photo should show. A high-confidence pass awards provisional credit. Parents can revoke it.</small></label><div class="row">${field('Reward (minutes)','minutes',t.minutes||15,'number','min="1" max="240" required')}<label>Category<select name="category">${[['chore','Chore'],['outdoor','Outdoor activity'],['responsibility','Responsibility'],['healthy','Healthy habit']].map(([v,l])=>`<option value="${v}" ${t.category===v?'selected':''}>${l}</option>`).join('')}</select></label></div><label>Assign to child<select name="childId" required><option value="">Choose a child</option>${state.members.filter(x=>x.role==='kid').map(k=>`<option value="${k.id}" ${t.childId===k.id?'selected':''}>${esc(k.name)}</option>`).join('')}</select></label><label class="check"><input type="checkbox" name="photoRequired" ${t.photoRequired!==false?'checked':''}> Photo required</label><label class="check"><input type="checkbox" name="recurring" ${t.recurring?'checked':''}> Repeat daily <small>(resets at midnight UTC)</small></label><button class="primary">Save task</button></form>`);}
+function openLinkedReview(){
+ const params=new URLSearchParams(location.search),id=params.get('review');if(!id||!user||!state||user.role!=='parent'||modal.open)return;
+ const sub=state.submissions.find(s=>s.id===id);params.delete('review');window.history.replaceState(null,'',location.pathname+(params.size?'?'+params.toString():''));
+ if(!sub){toast('That chore is not available in this family.');return;}
+ if(sub.photo)action('photo',id);else toast('This submission photo is no longer available.');
+}
 function notifications(){
  const unread=(state.notifications||[]).filter(n=>!n.readBy.includes(user.id));
- return `<section class="notification-panel" aria-label="Parent notifications"><div class="panel-heading"><h2>🔔 Greenie updates <span class="tag">${unread.length} unread</span></h2>${button('View all','notifications')}</div>${unread.length?unread.slice(0,3).map(notificationCard).join(''):'<p class="mini">You’re caught up. New provisional approvals appear here.</p>'}</section>`;
+ return `<section class="notification-panel" aria-label="Parent notifications"><div class="panel-heading"><h2>🔔 Greenie updates <span class="tag">${unread.length} unread</span></h2>${button('View all','notifications')}</div><p class="mini">Get alerts on this phone, even when GreenTime is closed. On iPhone/iPad (iOS 16.4+), use Share → Add to Home Screen, then open GreenTime from that icon.</p><div class="actions">${button(phonePushEnabled?'Turn off phone alerts':'Enable phone alerts',phonePushEnabled?'disablePush':'enablePush')}${button('Check this device','checkPush')}</div>${unread.length?unread.slice(0,3).map(notificationCard).join(''):'<p class="mini">You’re caught up. New provisional approvals appear here.</p>'}</section>`;
 }
 function notificationCard(n){
  const sub=state.submissions.find(s=>s.id===n.submissionId),unread=!n.readBy.includes(user.id);
@@ -71,13 +80,16 @@ function notificationCard(n){
 }
 async function action(act,id){
  switch(act){
+ case 'enablePush':phonePushEnabled=await enablePush(config.pushPublicKey,api);render();toast('Phone alerts enabled. A test notification was requested.');return;
+ case 'disablePush':phonePushEnabled=await disablePush(api);render();toast('Phone alerts disabled on this device.');return;
+ case 'checkPush':phonePushEnabled=await pushStatus(api);render();toast(phonePushEnabled?'This device is subscribed.':'Phone alerts are not enabled for this account on this device.');return;
  case 'notifications':open('<h2>Greenie notifications</h2>'+((state.notifications||[]).map(notificationCard).join('')||'<p>No provisional approvals yet.</p>'));return;
  case 'readNotification':await api('readNotification',{id});await refresh();if(modal.open)await action('notifications');return;
  case 'teach':{const task=state.tasks.find(t=>t.id===id);open(`<h2>Teach Greenie: ${esc(task.title)}</h2><p>Set your standard for future submissions of this task. Greenie uses these saved criteria with each new photo.</p><form class="form" data-form="saveCriteria"><input type="hidden" name="id" value="${esc(id)}"><label>What does done look like?<textarea name="criteria" required maxlength="1500" rows="6" placeholder="Sheets generally spread evenly, pillows stacked at the head of the bed, and no clutter.">${esc(task.criteria)}</textarea></label><button class="primary">Save Greenie’s criteria</button></form><h3>Criteria history</h3>${(task.criteriaHistory||[]).slice().reverse().map(h=>`<p><small>${new Date(h.at).toLocaleString()}</small><br>${esc(h.criteria)}</p>`).join('')||'<p>No saved changes yet.</p>'}`);return;}
  case 'choose-kid':case 'choose-parent':authRole=act.split('-')[1];authMode='register';render();return;
  case 'signin':authMode='login';render();return;case 'auth-back':authMode='choose';render();return;
  case 'demo-kid':case 'demo-parent':await api('demo',{role:act.split('-')[1]});tab=act==='demo-kid'?'My chores':'Reviews';await refresh();return;
- case 'logout':await api('logout');user=null;state=null;authMode='choose';render();return;
+ case 'logout':if(user.role==='parent')await disablePush(api);phonePushEnabled=false;await api('logout');user=null;state=null;authMode='choose';render();return;
  case 'newTask':if(!state.members.some(x=>x.role==='kid')){toast('Link a child in the Kids tab first.');return;}taskForm();return;
  case 'editTask':taskForm(state.tasks.find(t=>t.id===id));return;
  case 'archiveTask':open(`<h2>Archive this task?</h2><p class="lead">It will leave the available list. Submission history and earned minutes stay in the log.</p><form data-form="simple" class="form"><input type="hidden" name="action" value="archiveTask"><input type="hidden" name="id" value="${id}"><button class="primary">Archive task</button></form>`);return;
