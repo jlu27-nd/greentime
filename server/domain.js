@@ -5,6 +5,18 @@ export function ensure(ok,message,status=400){if(!ok)throw Object.assign(new Err
 const text=(v,max=200)=>String(v??'').trim().slice(0,max);
 const minutes=v=>{ensure(Number.isInteger(+v)&&+v>0&&+v<=240,'Minutes must be between 1 and 240.');return +v;};
 export function badges(s,id){const count=s.submissions.filter(x=>x.childId===id&&x.status==='approved').length;return [{name:'First little win',icon:'🌱',goal:1},{name:'Helping Hand',icon:'⭐',goal:5},{name:'Family teammate',icon:'🏆',goal:15}].map(x=>({...x,count,earned:count>=x.goal}));}
+// Only server-obtained assessments reach this function, under the household transaction lock.
+export function recordGreenie(s,id,result){
+ const sub=s.submissions.find(x=>x.id===id);
+ if(!sub||sub.status==='discarded')return;
+ sub.ai=result;
+ // Never undo a parent's decision, including when a late AI response arrives.
+ if(!sub.photo||sub.status!=='pending'||sub.reviewedBy||result.verdict!=='pass'||result.confidence!=='high')return;
+ const now=Date.now(),net=s.ledger.filter(x=>x.submissionId===id).reduce((n,x)=>n+x.amount,0),delta=sub.minutes-net;
+ if(delta)s.ledger.push({id:randomUUID(),at:now,childId:sub.childId,amount:delta,reason:`Greenie provisional approval: ${sub.title}`,submissionId:id});
+ sub.status='approved';sub.approvalSource='greenie';sub.provisional=true;sub.reviewedAt=now;
+ s.events.unshift({id:randomUUID(),at:now,actor:'Greenie',message:`Provisionally approved: ${sub.title}`,childId:sub.childId,amount:delta});
+}
 export function applyAction(s,user,action,p={},members=[]){
   const now=Date.now(),id=randomUUID(),parent=()=>ensure(user.role==='parent','Only a parent can do that.',403);
   const child=()=>ensure(user.role==='kid','Only a child can do that.',403);
@@ -33,13 +45,13 @@ export function applyAction(s,user,action,p={},members=[]){
     parent();const sub=s.submissions.find(x=>x.id===p.id);ensure(sub,'Submission not found.',404);
     const decision=p.decision;ensure(['approved','denied','returned','revoked','discarded'].includes(decision),'Invalid review decision.');
     ensure(sub.status!=='discarded','This submission is discarded.');
-    if(sub.status===decision)break;
+    if(sub.status===decision&&!(decision==='approved'&&sub.provisional))break;
     ensure(decision!=='revoked'||sub.status==='approved','Only approved credit can be revoked.');
     const net=s.ledger.filter(x=>x.submissionId===sub.id).reduce((n,x)=>n+x.amount,0);
     const target=decision==='approved'?sub.minutes:0,delta=target-net;
     // A reversal may create debt if earned time was already spent. Available time is clamped in the view; no new spending until repaid.
     if(delta)credit(sub.childId,delta,`${decision}: ${sub.title}`,sub.id);
-    sub.status=decision;sub.feedback=text(p.feedback,1000);sub.reviewedAt=now;sub.reviewedBy=user.id;
+    sub.status=decision;sub.feedback=text(p.feedback,1000);sub.reviewedAt=now;sub.reviewedBy=user.id;sub.provisional=false;sub.approvalSource='parent';
     if(decision==='discarded')sub.photo=null;
     log(`${decision}: ${sub.title}`,sub.childId,delta);break;
   }

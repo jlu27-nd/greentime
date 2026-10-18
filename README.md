@@ -24,7 +24,7 @@ Open http://127.0.0.1:4174. Choose **Try kid view** or **Try parent view** for t
 - Parent-controlled screen-time requests and a recorded session end time.
 - First Little Win, Helping Hand, and Family Teammate milestone badges.
 - Event log and per-child app rules.
-- Automatic Greenie assessment after a photo submission is saved. Parents see the photo and AI feedback together and can retry Greenie. AI failures leave the submission available for manual review. AI advice never changes credits; parents make every final decision.
+- Automatic Greenie assessment after a photo submission is saved. Parents see the photo and AI feedback together and can retry Greenie. AI failures leave the submission available for manual review. Only a high-confidence pass awards provisional credit automatically. All other results require parent approval. Parents can confirm without double payment or revoke and reclaim credit; late AI responses cannot override parent decisions.
 
 ## Vercel setup
 
@@ -43,12 +43,12 @@ pnpm test
 pnpm build
 ```
 
-Eleven tests cover real HTTP signup/linking/session flows, role and household isolation, duplicate approval, concurrent approval, return/resubmission, revocation, balance deductions, badges, and photo requirements. Local browser verification also confirmed that parent approval updates both balances to the same amount and unlocks the first badge.
+Fifteen tests cover real HTTP signup/linking/session flows, role and household isolation, duplicate approval, concurrent approval, return/resubmission, revocation, balance deductions, badges, and photo requirements. Local browser verification also confirmed that parent approval updates both balances to the same amount and unlocks the first badge.
 
 ## Boundaries and remaining deployment validation
 
 - Deployed at https://greentime-one.vercel.app in the Jon Lu LLC Vercel team, project `greentime`. Neon Free PostgreSQL is connected. Hosted checks passed signup, linking, photo persistence, parent-only decisions, concurrent duplicate approval, shared balances, and single screen-time deductions.
-- Greenie uses Vercel AI Gateway with `openai/gpt-4.1-mini`. Live photo review passed on October 18, 2026 using a synthetic verification task and the GreenTime logo: Greenie correctly identified the green laptop illustration. The assessment was saved, credits stayed at zero until parent approval, and duplicate parent approvals awarded the credit only once. This confirms service integration, not accuracy across real-world chore photos.
+- Greenie uses Vercel AI Gateway with `openai/gpt-4.1-mini`. Live photo review passed on October 18, 2026 using a synthetic verification task and the GreenTime logo: Greenie correctly identified the green laptop illustration. The assessment was saved, The original manual-approval flow was verified. The current policy awards provisional credit only for a high-confidence pass; automated tests cover all verdict/confidence combinations, confirmation, revocation, spent-credit debt, and late responses. This confirms service integration, not accuracy across real-world chore photos.
 - App rules are a family policy list, not operating-system app blocking. Actual enforcement requires a separate native/device-management integration.
 - Daily recurring chores reset at midnight UTC (shown in the editor).
 - Photo data is restricted by session/family membership and stored inside the family state for this small MVP. Photos are limited to 2 MB. Before substantial growth, move uploads to private object storage and normalize the family state into individual records.
