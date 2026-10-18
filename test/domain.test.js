@@ -34,3 +34,19 @@ test('spent provisional credit is reclaimed as debt and cannot be restored by AI
  applyAction(s,kid,'requestTime',{minutes:10},members);applyAction(s,parent,'reviewTime',{id:s.requests[0].id,decision:'approved'},members);
  applyAction(s,parent,'review',{id:sub.id,decision:'revoked'},members);recordGreenie(s,sub.id,highPass);assert.equal(balance(s,'k'),-10);assert.equal(badges(s,'k')[0].earned,false);assert.throws(()=>applyAction(s,kid,'requestTime',{minutes:1},members));
 });
+
+test('provisional approval sends one parent-only notification with per-parent read state',()=>{
+ const s=ready(),sub=s.submissions[0];sub.photo='data:image/png;base64,AAAA';recordGreenie(s,sub.id,highPass);recordGreenie(s,sub.id,highPass);assert.equal(s.notifications.length,1);
+ assert.equal(view(s,kid,members).notifications.length,0);const n=s.notifications[0];assert.throws(()=>applyAction(s,kid,'readNotification',{id:n.id},members),{status:403});
+ applyAction(s,parent,'readNotification',{id:n.id},members);assert.deepEqual(n.readBy,['p']);assert(!n.readBy.includes('other-parent'));
+});
+test('parent standards are logged and used in future submissions without changing historical criteria',()=>{
+ const s=ready(),sub=s.submissions[0],task=s.tasks[0];const original=sub.criteria;
+ assert.throws(()=>applyAction(s,kid,'saveCriteria',{id:task.id,criteria:'Anything passes'},members),{status:403});
+ applyAction(s,parent,'saveCriteria',{id:task.id,criteria:'Sheets evenly spread and pillows at the head.'},members);
+ assert.equal(sub.criteria,original);assert.equal(task.criteriaHistory.length,1);
+ applyAction(s,parent,'review',{id:sub.id,decision:'returned',feedback:'No clutter on the bed.',learnCriteria:true,requestId:'learn-once'},members);
+ applyAction(s,parent,'review',{id:sub.id,decision:'returned',feedback:'No clutter on the bed.',learnCriteria:true,requestId:'learn-once'},members);
+ assert.equal(task.criteriaHistory.length,2);assert.match(task.criteria,/No clutter/);
+ applyAction(s,kid,'submit',{taskId:task.id},members);assert.equal(s.submissions[0].criteria,task.criteria);assert(s.events.some(e=>e.message.includes('Learned parent standard')));
+});

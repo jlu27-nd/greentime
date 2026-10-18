@@ -15,6 +15,7 @@ export function recordGreenie(s,id,result){
  const now=Date.now(),net=s.ledger.filter(x=>x.submissionId===id).reduce((n,x)=>n+x.amount,0),delta=sub.minutes-net;
  if(delta)s.ledger.push({id:randomUUID(),at:now,childId:sub.childId,amount:delta,reason:`Greenie provisional approval: ${sub.title}`,submissionId:id});
  sub.status='approved';sub.approvalSource='greenie';sub.provisional=true;sub.reviewedAt=now;
+ (s.notifications??=[]).unshift({id:randomUUID(),submissionId:id,childId:sub.childId,title:sub.title,minutes:sub.minutes,at:now,readBy:[]});
  s.events.unshift({id:randomUUID(),at:now,actor:'Greenie',message:`Provisionally approved: ${sub.title}`,childId:sub.childId,amount:delta});
 }
 export function applyAction(s,user,action,p={},members=[]){
@@ -24,6 +25,13 @@ export function applyAction(s,user,action,p={},members=[]){
   const credit=(childId,amount,reason,submissionId=null)=>s.ledger.push({id:randomUUID(),at:now,childId,amount,reason,submissionId});
   if(p.requestId&&s.receipts.includes(p.requestId))return;
   switch(action){
+  case 'readNotification':{parent();const n=(s.notifications||[]).find(x=>x.id===p.id);ensure(n,'Notification not found.',404);if(!n.readBy.includes(user.id))n.readBy.push(user.id);break;}
+  case 'saveCriteria':{
+    parent();const task=s.tasks.find(x=>x.id===p.id);ensure(task,'Task not found.',404);
+    const criteria=String(p.criteria||'').trim();ensure(criteria&&criteria.length<=1500,'Describe the completion standard in 1–1500 characters.');
+    (task.criteriaHistory??=[]).push({at:now,by:user.id,previous:task.criteria,criteria});task.criteria=criteria;
+    log(`Updated Greenie criteria for ${task.title}: ${criteria}`,task.childId);break;
+  }
   case 'saveTask':{
     parent();ensure(members.some(x=>x.id===p.childId&&x.role==='kid'),'Choose a linked child.');
     const title=text(p.title,100);ensure(title,'Give the task a title.');
@@ -45,6 +53,13 @@ export function applyAction(s,user,action,p={},members=[]){
     parent();const sub=s.submissions.find(x=>x.id===p.id);ensure(sub,'Submission not found.',404);
     const decision=p.decision;ensure(['approved','denied','returned','revoked','discarded'].includes(decision),'Invalid review decision.');
     ensure(sub.status!=='discarded','This submission is discarded.');
+    if(p.learnCriteria){
+      const task=s.tasks.find(x=>x.id===sub.taskId),feedback=text(p.feedback,1000);ensure(task&&feedback,'Add a clear completion standard for Greenie first.');
+      const criteria=[task.criteria,feedback].filter(Boolean).join('\n');ensure(criteria.length<=1500,'These criteria are too long. Use Teach Greenie to edit them.');
+      (task.criteriaHistory??=[]).push({at:now,by:user.id,previous:task.criteria,criteria,submissionId:sub.id});task.criteria=criteria;
+      log(`Learned parent standard for ${task.title}: ${feedback}`,sub.childId);
+    }
+    for(const n of s.notifications||[])if(n.submissionId===sub.id&&!n.readBy.includes(user.id))n.readBy.push(user.id);
     if(sub.status===decision&&!(decision==='approved'&&sub.provisional))break;
     ensure(decision!=='revoked'||sub.status==='approved','Only approved credit can be revoked.');
     const net=s.ledger.filter(x=>x.submissionId===sub.id).reduce((n,x)=>n+x.amount,0);
@@ -70,5 +85,5 @@ export function applyAction(s,user,action,p={},members=[]){
 }
 export function view(s,user,members){
   const allowed=x=>user.role==='parent'||x.childId===user.id;
-  return {...s,tasks:s.tasks.filter(allowed),submissions:s.submissions.filter(allowed),requests:s.requests.filter(allowed),ledger:s.ledger.filter(allowed),rules:s.rules.filter(allowed),events:s.events.filter(allowed),receipts:undefined,members:members.filter(x=>user.role==='parent'||x.id===user.id).map(x=>({id:x.id,name:x.name,role:x.role,balance:balance(s,x.id),badges:badges(s,x.id)}))};
+  return {...s,notifications:user.role==='parent'?(s.notifications||[]):[],tasks:s.tasks.filter(allowed),submissions:s.submissions.filter(allowed),requests:s.requests.filter(allowed),ledger:s.ledger.filter(allowed),rules:s.rules.filter(allowed),events:s.events.filter(allowed),receipts:undefined,members:members.filter(x=>user.role==='parent'||x.id===user.id).map(x=>({id:x.id,name:x.name,role:x.role,balance:balance(s,x.id),badges:badges(s,x.id)}))};
 }

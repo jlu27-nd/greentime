@@ -43,7 +43,7 @@ pnpm test
 pnpm build
 ```
 
-Fifteen tests cover real HTTP signup/linking/session flows, role and household isolation, duplicate approval, concurrent approval, return/resubmission, revocation, balance deductions, badges, and photo requirements. Local browser verification also confirmed that parent approval updates both balances to the same amount and unlocks the first badge.
+Seventeen tests cover real HTTP signup/linking/session flows, role and household isolation, duplicate approval, concurrent approval, return/resubmission, revocation, balance deductions, badges, and photo requirements. Local browser verification also confirmed that parent approval updates both balances to the same amount and unlocks the first badge.
 
 ## Boundaries and remaining deployment validation
 
@@ -70,3 +70,9 @@ Fifteen tests cover real HTTP signup/linking/session flows, role and household i
 
 - https://node-postgres.com/features/transactions
 - https://developers.openai.com/api/docs/guides/images-vision
+
+## Parent notifications and learning
+
+Provisional approvals create persistent in-app parent notifications, with per-parent read state, photo access, and revocation. The visible app refreshes every 15 seconds outside dialogs; notifications are also loaded on sign-in. These are not email, SMS, or closed-app push notifications.
+
+Teach Greenie saves explicit, editable standards for the same task, with change history and activity log entries. Parents can also append a review note as a future criterion by selecting the checkbox. New submissions snapshot the current standard; manual AI retries use the latest task standard. Assessments record criteriaUsed. This is task-specific context supplied to the model, not model fine-tuning or a guarantee of improved accuracy.

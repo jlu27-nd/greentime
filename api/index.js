@@ -22,7 +22,7 @@ export default async function handler(req,res){
   p=p||{};ensure(JSON.stringify(p).length<=3000000,'Upload is too large.',413);
   if(['login','register','link','greenie'].includes(p.action)){const key=digest(`${p.action}:${req.socket?.remoteAddress||'remote'}:${String(p.email||'').toLowerCase()}`);const allowed=await transaction(db=>limit(db,key,p.action==='greenie'?30:15));ensure(allowed,'Too many attempts. Please try again in 15 minutes.',429);}
   if(p.action==='greenie'){
-   const snapshot=await transaction(async db=>{const u=await session(db,req);ensure(u.role==='parent','Only parents can ask Greenie to review photos.',403);const s=await family(db,u);const sub=s.submissions.find(x=>x.id===p.id);ensure(sub,'Submission not found.',404);return {sub,u};});
+   const snapshot=await transaction(async db=>{const u=await session(db,req);ensure(u.role==='parent','Only parents can ask Greenie to review photos.',403);const s=await family(db,u);const sub=s.submissions.find(x=>x.id===p.id);ensure(sub,'Submission not found.',404);const task=s.tasks.find(t=>t.id===sub.taskId);return {sub:{...sub,criteria:task?.criteria??sub.criteria},u};});
    const result=await assess(snapshot.sub);await transaction(async db=>{const u=await session(db,req);ensure(u.id===snapshot.u.id,'Session changed.',403);const s=await family(db,u);const sub=s.submissions.find(x=>x.id===p.id);ensure(sub&&sub.status!=='discarded','Submission is no longer available.');recordGreenie(s,sub.id,result);await save(db,u,s);});res.end(JSON.stringify({ok:true}));return;
   }
   let photoReview;

@@ -13,5 +13,5 @@ export async function assess(sub){
  }
  const data=await response.json();const output=data.output?.flatMap(x=>x.content||[]).filter(x=>x.type==='output_text').map(x=>x.text).join('');
  const result=JSON.parse(output);if(!['pass','fail','uncertain'].includes(result.verdict)||!['low','medium','high'].includes(result.confidence)||typeof result.reason!=='string')throw new Error('Greenie returned an unreadable assessment. Please use parent review.');
- return {...result,reason:result.reason.slice(0,1000),at:Date.now()};
+ return {...result,criteriaUsed:sub.criteria||'',reason:result.reason.slice(0,1000),at:Date.now()};
 }
