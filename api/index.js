@@ -1,7 +1,7 @@
 import { randomUUID, randomBytes, createHash, scryptSync, timingSafeEqual } from 'node:crypto';
 import { transaction } from '../server/db.js';
 import { emptyState, applyAction, view, ensure } from '../server/domain.js';
-import { assess } from '../server/greenie.js';
+import { assess, greenieConfigured } from '../server/greenie.js';
 const digest=x=>createHash('sha256').update(x).digest('hex');
 const hashPassword=p=>{const salt=randomBytes(16).toString('hex');return salt+':'+scryptSync(p,salt,64).toString('hex');};
 const verify=(p,h)=>{const [salt,key]=h.split(':');return !!key&&timingSafeEqual(Buffer.from(key,'hex'),scryptSync(p,salt,64));};
@@ -15,7 +15,7 @@ async function limit(db,key,max=15){const now=Date.now();let [a]=await db.q('SEL
 export default async function handler(req,res){
  res.setHeader('Content-Type','application/json');res.setHeader('Cache-Control','no-store');
  try{
-  if(req.method==='GET'){const config=new URL(req.url,'http://local').searchParams.get('config');if(config){res.end(JSON.stringify({demo:demo(),greenie:!!(process.env.OPENAI_API_KEY&&process.env.OPENAI_MODEL)}));return;}}
+  if(req.method==='GET'){const config=new URL(req.url,'http://local').searchParams.get('config');if(config){res.end(JSON.stringify({demo:demo(),greenie:greenieConfigured()}));return;}}
   ensure(['GET','POST'].includes(req.method),'Method not allowed.',405);
   if(req.method==='POST'){ensure(req.headers['content-type']?.includes('application/json'),'JSON required.',415);const origin=req.headers.origin;ensure(!origin||new URL(origin).host===req.headers.host,'Request origin is not allowed.',403);}
   let p=req.body;if(req.method==='POST'&&!p){let raw='';for await(const c of req){raw+=c;ensure(Buffer.byteLength(raw)<=3000000,'Upload is too large.',413);}p=JSON.parse(raw||'{}');}

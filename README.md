@@ -26,13 +26,13 @@ Open http://127.0.0.1:4174. Choose **Try kid view** or **Try parent view** for t
 - Event log and per-child app rules.
 - Optional Greenie photo assessment. AI advice never changes credits; parents make every final decision.
 
-## Vercel setup (not deployed yet)
+## Vercel setup
 
 1. Import `jlu27-nd/greentime` into Vercel. The project display name is GreenTime; Vercel may normalize its slug to `greentime`.
-2. Framework preset: Other. Build: `node scripts/build.js`. Output: `dist`. Node.js: 24.x. API entrypoint: `api/index.js`.
+2. Framework preset: Other. Build: `node scripts/migrate.js && node scripts/build.js`. Output: `dist`. Node.js: 24.x. API entrypoint: `api/index.js`.
 3. Provision PostgreSQL in the intended environment and set `DATABASE_URL` using the provider's TLS-enabled connection string. Do not disable certificate verification.
-4. Apply the additive schema once against the selected database: `node --env-file=.env.local scripts/migrate.js`. Do this only after confirming the target database.
-5. Optionally set `OPENAI_API_KEY` and `OPENAI_MODEL` to an image-capable Responses API model available in your account. These stay server-side. Without them, Greenie explicitly says it is unavailable; manual photo review works.
+4. The Vercel build applies the additive, idempotent schema to its connected database before building the frontend. A failed migration blocks the release. For a manual migration use `node --env-file=.env.local scripts/migrate.js` only after confirming the target database.
+5. For Vercel AI Gateway, set `AI_GATEWAY_MODEL=openai/gpt-4.1-mini`; project OIDC authenticates requests without a stored API key. AI Gateway credits/account verification must be enabled. For direct OpenAI access instead, set `OPENAI_API_KEY` and `OPENAI_MODEL` to an image-capable Responses API model available in your account. These stay server-side. Without either configuration, Greenie explicitly says it is unavailable; manual photo review works.
 6. Leave `DEMO_MODE=false` for production. No demo account shortcut is exposed on Vercel.
 7. Deploy, create fresh parent and child accounts, generate/link a child code, and verify a photo submission and approval from separate devices.
 
@@ -51,7 +51,7 @@ Nine tests cover real HTTP signup/linking/session flows, role and household isol
 - App rules are a family policy list, not operating-system app blocking. Actual enforcement requires a separate native/device-management integration.
 - Daily recurring chores reset at midnight UTC (shown in the editor).
 - Photo data is restricted by session/family membership and stored inside the family state for this small MVP. Photos are limited to 2 MB. Before substantial growth, move uploads to private object storage and normalize the family state into individual records.
-- If a parent chooses Ask Greenie, that submission photo and task criteria are sent to the configured OpenAI API. Responses are requested with `store:false`; this is not a claim of zero provider retention.
+- If a parent chooses Ask Greenie, that submission photo and task criteria are sent to OpenAI, through Vercel AI Gateway when configured. Responses are requested with `store:false`; this is not a claim of zero provider retention.
 - No email delivery, email verification, password recovery, native device controls, or production observability is configured. Add and validate these before a broader family rollout.
 - Credit reversals can create debt after minutes have already been used. Available screen time is zero until future earnings repay the debt; the underlying ledger remains auditable.
 
